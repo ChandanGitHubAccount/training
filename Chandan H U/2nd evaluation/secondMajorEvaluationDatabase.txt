@@ -1,0 +1,112 @@
+-> create database railwayreservationdatabases;
+
+
+-> use railwayreservationdatabases;
+
+
+-> CREATE TABLE `passengerdetails` (
+  `passengerid` int NOT NULL,
+  `gender` varchar(255) NOT NULL,
+  `passengername` varchar(255) NOT NULL,
+  PRIMARY KEY (`passengerid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+-> CREATE TABLE `ticketdetails` (
+  `ticketid` int NOT NULL,
+  `coachtype` varchar(255) NOT NULL,
+  `traindestination` varchar(255) NOT NULL,
+  `numberofseats` int NOT NULL,
+  `trainstartingpoint` varchar(255) NOT NULL,
+  `ticketamount` int NOT NULL,
+  `bookeddate` date NOT NULL,
+  `ticketstatus` varchar(255) NOT NULL,
+  `passengerid` int NOT NULL,
+  `trainnumber` int NOT NULL,
+  `waitingid` int DEFAULT NULL,
+  PRIMARY KEY (`ticketid`),
+  KEY `trainnumber` (`trainnumber`),
+  KEY `passengerid` (`passengerid`),
+  CONSTRAINT `ticketdetails_ibfk_1` FOREIGN KEY (`trainnumber`) REFERENCES `traindetails` (`trainnumber`),
+  CONSTRAINT `ticketdetails_ibfk_2` FOREIGN KEY (`passengerid`) REFERENCES `passengerdetails` (`passengerid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+-> CREATE TABLE `traindetails` (
+  `trainnumber` int NOT NULL,
+  `traindestination` varchar(255) NOT NULL,
+  `trainstartingpoint` varchar(255) NOT NULL,
+  `trainname` varchar(200) DEFAULT NULL,
+  PRIMARY KEY (`trainnumber`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+-> CREATE TABLE `trainstatus` (
+  `coachtype` varchar(255) NOT NULL,
+  `numberofseats` int NOT NULL,
+  `trainNumber` int NOT NULL,
+  `numberOfSeatsBooked` int DEFAULT NULL,
+  `runningDate` date DEFAULT NULL,
+  PRIMARY KEY (`coachtype`,`trainNumber`),
+  KEY `trainNumber` (`trainNumber`),
+  CONSTRAINT `trainstatus_ibfk_1` FOREIGN KEY (`trainNumber`) REFERENCES `traindetails` (`trainnumber`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+-> show tables;
+
++---------------------------------------+
+| Tables_in_railwayreservationdatabases |
++---------------------------------------+
+| passengerdetails                      |
+| ticketdetails                         |
+| traindetails                          |
+| trainstatus                           |
++---------------------------------------+
+
+-> desc passengerdetails;
++---------------+--------------+------+-----+---------+-------+
+| Field         | Type         | Null | Key | Default | Extra |
++---------------+--------------+------+-----+---------+-------+
+| passengerid   | int          | NO   | PRI | NULL    |       |
+| gender        | varchar(255) | NO   |     | NULL    |       |
+| passengername | varchar(255) | NO   |     | NULL    |       |
++---------------+--------------+------+-----+---------+-------+
+
+-> desc traindetails;
++--------------------+--------------+------+-----+---------+-------+
+| Field              | Type         | Null | Key | Default | Extra |
++--------------------+--------------+------+-----+---------+-------+
+| trainnumber        | int          | NO   | PRI | NULL    |       |
+| traindestination   | varchar(255) | NO   |     | NULL    |       |
+| trainstartingpoint | varchar(255) | NO   |     | NULL    |       |
+| trainname          | varchar(200) | YES  |     | NULL    |       |
++--------------------+--------------+------+-----+---------+-------+
+
+->  desc trainstatus;
++---------------------+--------------+------+-----+---------+-------+
+| Field               | Type         | Null | Key | Default | Extra |
++---------------------+--------------+------+-----+---------+-------+
+| coachtype           | varchar(255) | NO   | PRI | NULL    |       |
+| numberofseats       | int          | NO   |     | NULL    |       |
+| trainNumber         | int          | NO   | PRI | NULL    |       |
+| numberOfSeatsBooked | int          | YES  |     | NULL    |       |
+| runningDate         | date         | YES  |     | NULL    |       |
++---------------------+--------------+------+-----+---------+-------+
+
+->  desc ticketdetails;
++--------------------+--------------+------+-----+---------+-------+
+| Field              | Type         | Null | Key | Default | Extra |
++--------------------+--------------+------+-----+---------+-------+
+| ticketid           | int          | NO   | PRI | NULL    |       |
+| coachtype          | varchar(255) | NO   |     | NULL    |       |
+| traindestination   | varchar(255) | NO   |     | NULL    |       |
+| numberofseats      | int          | NO   |     | NULL    |       |
+| trainstartingpoint | varchar(255) | NO   |     | NULL    |       |
+| ticketamount       | int          | NO   |     | NULL    |       |
+| bookeddate         | date         | NO   |     | NULL    |       |
+| ticketstatus       | varchar(255) | NO   |     | NULL    |       |
+| passengerid        | int          | NO   | MUL | NULL    |       |
+| trainnumber        | int          | NO   | MUL | NULL    |       |
+| waitingid          | int          | YES  |     | NULL    |       |
++--------------------+--------------+------+-----+---------+-------+

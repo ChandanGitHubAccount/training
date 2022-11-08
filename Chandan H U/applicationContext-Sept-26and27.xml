@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+    http://www.springframework.org/schema/beans/spring-beans.xsd
+    http://www.springframework.org/schema/context
+    http://www.springframework.org/schema/context/spring-context.xsd">
+
+
+    <!-- Define your beans here -->
+
+   <!-- <bean id = "myCoach" class = "September26.TrackCoach" >
+     </bean>
+
+     <bean id = "coach" class="September26.BaseballCoach">
+     </bean> -->
+
+    <!-- constructor  -->
+
+  <bean id ="bookstore_1" class="September26.BookStore">
+        <constructor-arg value="JAVA"/>
+        <constructor-arg value="Sumanth"/>
+        <constructor-arg value="4544"/>
+        <constructor-arg value="200"/>
+    </bean>
+
+    <!-- user constructor -->
+
+    <bean id = "user_1" class="September26.User">
+        <constructor-arg value="J01"/>
+    </bean>
+
+    <!-- map constructor -->
+
+   <bean id = "bookstore-map_1" class="September26.BookStoreMap">
+        <constructor-arg>
+            <map>
+                <entry key-ref="user_1" value-ref="bookstore_1"/>
+            </map>
+        </constructor-arg>
+    </bean>
+    <bean id = "user_2" class="September26.Users">
+        <property name="BookNumber" value="J02"/>
+    </bean>
+    <bean id = "books_2" class="September26.Books">
+        <property name="BookName" value="JAVA"/>
+        <property name="BookAuthor" value="Chandan"/>
+        <property name="BookPrice" value="5264"/>
+    </bean>
+
+    <bean id = "books_by_setter" class="September26.BooksStoreUsingGetter">
+
+        <property name="booksMap">
+            <map >
+                <entry key-ref="user_2" value-ref="books_2"/>
+            </map>
+        </property>
+    </bean>
+
+</beans>
