@@ -10,9 +10,9 @@ public interface SystemInterface {
 
     int generateOTP();
 
-    String verifyEmail(int otp) throws OTPGenerateException, EmailValidationException, SessionIdExpiredException;
+    String verifyEmail(int otp , String email) throws OTPGenerateException, EmailValidationException, SessionIdExpiredException;
 
-    String sendOTP() throws SessionIdExpiredException, OTPGenerateException;
+    String sendOTP(String email) throws SessionIdExpiredException, OTPGenerateException;
 
     boolean verifyCard(long cardNumber);
 

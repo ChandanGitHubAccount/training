@@ -1,0 +1,258 @@
+->create table restaurants (
+        restaurant_id varchar(10) not null,
+        restaurant_address varchar(250) not null,
+        restaurant_name varchar(250) not null,
+	open_at time not null,
+	close_at time not null,
+	close_on varchar(10) not null,
+	restaurant_photo varchar(250),
+	ratings int not null,
+        primary key (restaurant_id)
+    );
+
+->  desc restaurants;
++--------------------+--------------+------+-----+---------+-------+
+| Field              | Type         | Null | Key | Default | Extra |
++--------------------+--------------+------+-----+---------+-------+
+| restaurant_id      | varchar(10)  | NO   | PRI | NULL    |       |
+| restaurant_address | varchar(250) | NO   |     | NULL    |       |
+| restaurant_name    | varchar(250) | NO   |     | NULL    |       |
+| open_at            | time         | NO   |     | NULL    |       |
+| close_at           | time         | NO   |     | NULL    |       |
+| close_on           | varchar(10)  | NO   |     | NULL    |       |
+| restaurant_photo   | varchar(250) | YES  |     | NULL    |       |
+| ratings            | int          | NO   |     | NULL    |       |
++--------------------+--------------+------+-----+---------+-------+
+
+-> create table categories(
+        categoryName varchar(250) primary key not null,
+        restaurant_id varchar(10) not null ,
+	deliveryCharge int not null,
+	foreign key(restaurant_id) references restaurants(restaurant_id) on delete cascade 
+	);
+
+
+->  desc categories;
++----------------+--------------+------+-----+---------+-------+
+| Field          | Type         | Null | Key | Default | Extra |
++----------------+--------------+------+-----+---------+-------+
+| categoryName   | varchar(250) | NO   | PRI | NULL    |       |
+| restaurant_id  | varchar(10)  | NO   | MUL | NULL    |       |
+| deliveryCharge | int          | NO   |     | NULL    |       |
++----------------+--------------+------+-----+---------+-------+
+
+
+-> create table menu( 
+	itemName varchar(250) not null, 
+	categoryName varchar(250) not null , 
+	description varchar(255), 
+	itemPrice int not null, 
+	itemPhoto varchar(250), 
+	restaurant_id varchar(10) not null ,
+	primary key(itemName,categoryName),
+	foreign key(categoryName) references categories(categoryName) on delete cascade,
+	foreign key(restaurant_id) references restaurants(restaurant_id) on delete cascade
+	);
+
+->  desc menu;
++---------------+--------------+------+-----+---------+-------+
+| Field         | Type         | Null | Key | Default | Extra |
++---------------+--------------+------+-----+---------+-------+
+| itemName      | varchar(250) | NO   |     | NULL    |       |
+| categoryName  | varchar(250) | NO   | MUL | NULL    |       |
+| description   | varchar(255) | YES  |     | NULL    |       |
+| itemPrice     | int          | NO   |     | NULL    |       |
+| itemPhoto     | varchar(250) | YES  |     | NULL    |       |
+| restaurant_id | varchar(10)  | NO   | MUL | NULL    |       |
++---------------+--------------+------+-----+---------+-------+
+
+
+-> create table payment(
+	paymentType varchar(20) not null , 
+	restaurant_id varchar(10) not null ,
+	foreign key(restaurant_id) references restaurants(restaurant_id) on delete cascade
+	);
+
+-> desc payment;
++---------------+-------------+------+-----+---------+-------+
+| Field         | Type        | Null | Key | Default | Extra |
++---------------+-------------+------+-----+---------+-------+
+| paymentType   | varchar(20) | NO   |     | NULL    |       |
+| restaurant_id | varchar(10) | NO   | MUL | NULL    |       |
++---------------+-------------+------+-----+---------+-------+
+
+->create table restaurantOrders( 
+	restaurant_id varchar(10) not null,
+	orderId varchar(10) not null,
+	totalBill int not null,
+	foreign key(restaurant_id) references restaurants(restaurant_id) on delete cascade, 
+	foreign key(orderId) references myOrders(orderId)
+	);
+
+http://localhost:8080/restaurant/get-orders
+
+-> desc resturentOrders;
++---------------+-------------+------+-----+---------+-------+
+| Field         | Type        | Null | Key | Default | Extra |
++---------------+-------------+------+-----+---------+-------+
+| restaurant_id | varchar(10) | NO   | MUL | NULL    |       |
+| orderId       | varchar(10) | NO   | MUL | NULL    |       |
+| totalBill     | int         | NO   |     | NULL    |       |
++---------------+-------------+------+-----+---------+-------+
+
+**************************************************USER TABLES*****************************************************
+
+
+-> create table users (
+        user_id varchar(10) not null,
+        created_date date not null,
+        email varchar(255) not null,
+        gender varchar(255) not null,
+        password varchar(250) not null,
+        phone_number bigint not null,
+        username varchar(255) not null,
+	account_status varchar(20) not null,
+	profile_photo varchar(250),
+        primary key (user_id),
+	unique key(email),
+	unique key(phone_number)
+    );
+
+->  desc users;
++----------------+--------------+------+-----+---------+-------+
+| Field          | Type         | Null | Key | Default | Extra |
++----------------+--------------+------+-----+---------+-------+
+| user_id        | varchar(10)  | NO   | PRI | NULL    |       |
+| created_date   | date         | NO   |     | NULL    |       |
+| email          | varchar(255) | NO   | UNI | NULL    |       |
+| gender         | varchar(255) | NO   |     | NULL    |       |
+| password       | varchar(250) | NO   |     | NULL    |       |
+| phone_number   | bigint       | NO   | UNI | NULL    |       |
+| username       | varchar(255) | NO   |     | NULL    |       |
+| account_status | varchar(20)  | NO   |     | NULL    |       |
+| profile_photo  | varchar(250) | YES  |     | NULL    |       |
++----------------+--------------+------+-----+---------+-------+
+
+-> create table favourites(
+	userId varchar(10) not null , 
+	restaurantName varchar(250) not null
+	);
+
+-> desc favourites;
++----------------+--------------+------+-----+---------+-------+
+| Field          | Type         | Null | Key | Default | Extra |
++----------------+--------------+------+-----+---------+-------+
+| userId         | varchar(10)  | NO   |     | NULL    |       |
+| restaurantName | varchar(250) | NO   |     | NULL    |       |
++----------------+--------------+------+-----+---------+-------+
+
+-> create table tokens(
+	secureToken varchar(20) primary Key not null , 
+	user_id varchar(10) not null , 
+	createdAt datetime not null , 
+	expireAt datetime not null , 
+	tokenStatus varchar(20) not null , 
+	foreign key(user_id) references users(user_id) on delete cascade
+	);
+
+->desc tokens;
++-------------+-------------+------+-----+---------+-------+
+| Field       | Type        | Null | Key | Default | Extra |
++-------------+-------------+------+-----+---------+-------+
+| secureToken | varchar(20) | NO   | PRI | NULL    |       |
+| user_id     | varchar(10) | NO   | MUL | NULL    |       |
+| createdAt   | datetime    | NO   |     | NULL    |       |
+| expireAt    | datetime    | NO   |     | NULL    |       |
+| tokenStatus | varchar(20) | NO   |     | NULL    |       |
++-------------+-------------+------+-----+---------+-------+
+
+
+->  create table myOrders(
+	orderId varchar(10) primary key not null, 
+	userId varchar(250) not null ,
+	restaurant_id varchar(10) not null ,
+	orderDateTime datetime not null, 
+	totalBill int not null , 
+	paymentMethod varchar(20) not null, 
+	orderStatus varchar(20) not null , 
+	foreign key(userId) references users(user_id) on delete cascade,
+	foreign key(restaurant_id) references restaurants(restaurant_id) on delete cascade
+	);
+
+-> desc myOrders;
++---------------+--------------+------+-----+---------+-------+
+| Field         | Type         | Null | Key | Default | Extra |
++---------------+--------------+------+-----+---------+-------+
+| orderId       | varchar(10)  | NO   | PRI | NULL    |       |
+| userId        | varchar(250) | NO   | MUL | NULL    |       |
+| restaurant_id | varchar(10)  | NO   | MUL | NULL    |       |
+| orderDateTime | datetime     | NO   |     | NULL    |       |
+| totalBill     | int          | NO   |     | NULL    |       |
+| paymentMethod | varchar(20)  | NO   |     | NULL    |       |
+| orderStatus   | varchar(20)  | NO   |     | NULL    |       |
++---------------+--------------+------+-----+---------+-------+
+
+-> create table myOrderItems(
+	orderId varchar(10) not null,
+	itemName varchar(250) not null,
+	categoryName varchar(250) not null ,
+	numberOfItems int not null,
+	foreign key(orderId) references myOrders(orderId) on delete cascade,
+	foreign key(categoryName) references categories(categoryName) on delete cascade
+	);
+
+-> desc myorderitems;
++---------------+--------------+------+-----+---------+-------+
+| Field         | Type         | Null | Key | Default | Extra |
++---------------+--------------+------+-----+---------+-------+
+| orderId       | varchar(10)  | NO   | MUL | NULL    |       |
+| itemName      | varchar(250) | NO   |     | NULL    |       |
+| categoryName  | varchar(250) | NO   | MUL | NULL    |       |
+| numberOfItems | int          | NO   |     | NULL    |       |
++---------------+--------------+------+-----+---------+-------+
+
+-> create table OTPManager ( 
+	user_id varchar(10) not null , 
+	email varchar(255) not null , 
+	otp int not null , 
+	foreign key(user_id) references users(user_id) on delete cascade
+	);
+
+
+-> desc otpmanager;
++---------+--------------+------+-----+---------+-------+
+| Field   | Type         | Null | Key | Default | Extra |
++---------+--------------+------+-----+---------+-------+
+| user_id | varchar(10)  | NO   | MUL | NULL    |       |
+| email   | varchar(255) | NO   |     | NULL    |       |
+| otp     | int          | NO   |     | NULL    |       |
++---------+--------------+------+-----+---------+-------+
+
+->create table cards(
+	user_id varchar(10) not null ,
+	cardNumber bigint,
+	unique key(cardNumber),
+	foreign key(user_id) references users(user_id) on delete cascade
+	);
+
+-> desc cards;
++------------+-------------+------+-----+---------+-------+
+| Field      | Type        | Null | Key | Default | Extra |
++------------+-------------+------+-----+---------+-------+
+| user_id    | varchar(10) | NO   | MUL | NULL    |       |
+| cardNumber | bigint      | YES  | UNI | NULL    |       |
++------------+-------------+------+-----+---------+-------+
+
+-> create table session(
+	user_id varchar(20) not null , 
+	sessionId varchar(10) not null,
+	foreign key(user_id) references users(user_id) on delete cascade
+	);
+
+-> desc session;
++-----------+-------------+------+-----+---------+-------+
+| Field     | Type        | Null | Key | Default | Extra |
++-----------+-------------+------+-----+---------+-------+
+| user_id   | varchar(20) | NO   | MUL | NULL    |       |
+| sessionId | varchar(10) | NO   |     | NULL    |       |
++-----------+-------------+------+-----+---------+-------+

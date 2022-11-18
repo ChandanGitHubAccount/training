@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -64,21 +65,26 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
     @Override
     public String signIn(String email, String password) throws LoginFailedException, SessionIdExpiredException {
         try {
-            if (sessionId == null) {
-                List<Users> user = userRepository.findByEmailAndPassword(email, password);
-                if (user.isEmpty())
-                    return "Invalid email or password";
+            List<Users> user = userRepository.findByEmailAndPassword(email, password);
+            if (user.isEmpty())
+                return "Invalid email or password";
+            List<Session> session = jdbcTemplate.query("select * from session where user_id = ?",
+                    new BeanPropertyRowMapper<>(Session.class), user.get(0).getUserId());
+            if (session.isEmpty()) {
                 if (user.get(0).getAccountStatus().equalsIgnoreCase(AccountStatus.NOTVERIFIED.toString()))
                     return "verify the email before login";
                 this.loggedUser = user.get(0);
-                this.sessionId = generateSessionId();
+                String sessionId = generateSessionId();
+                this.sessionId = sessionId;
+                jdbcTemplate.update("Insert into session values(?,?)", user.get(0).getUserId(), sessionId);
                 return "Login Successful with Session Id : " + sessionId;
             }
-            throw new SessionIdExpiredException("you are already logged in. please logout for new sign in");
+            throw new SessionIdExpiredException("you are already logged in");
 
         } catch (DataAccessException exception) {
             throw new LoginFailedException("Failed login");
         }
+
     }
 
     @Override
@@ -88,6 +94,8 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
                 String userId = generateId();
                 if (userRepository.findById(userId).isPresent())
                     signUp(user, profilePhoto);
+                user.setUserId(userId);
+                user.setCreatedDate(LocalDate.now());
                 user.setAccountStatus(AccountStatus.NOTVERIFIED.toString());
                 if (profilePhoto.getOriginalFilename() != null) {
                     user.setProfilePhoto(userProfileFilePath + File.separator + profilePhoto.getOriginalFilename());
@@ -109,6 +117,8 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
     public String signOut() throws SignOutException {
         try {
             if (sessionId != null) {
+                jdbcTemplate.update("delete from session where user_id = ? and sessionId = ?",
+                        loggedUser.getUserId(), sessionId);
                 this.loggedUser = null;
                 this.sessionId = null;
                 return "sign out successful";
@@ -276,9 +286,9 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
     }
 
     @Override
-    public String verifyEmail(int userOTP) throws EmailValidationException, SessionIdExpiredException {
+    public String verifyEmail(int userOTP, String email) throws EmailValidationException, SessionIdExpiredException {
         if (sessionId == null) {
-            if (userOTP == getOtp().get(0).getOtp()) {
+            if (userOTP == getOtp(email).get(0).getOtp()) {
                 jdbcTemplate.update("update users set account_status = ?", AccountStatus.VERIFIED.toString());
                 return "Email verified successfully";
             }
@@ -287,28 +297,29 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
         throw new SessionIdExpiredException("You already logged in");
     }
 
-    private List<OTPManager> getOtp() {
-        return jdbcTemplate.query("Select * from otpManager where user_id = ? and email = ?",
-                new BeanPropertyRowMapper<>(OTPManager.class), loggedUser.getUserId(), loggedUser.getEmail());
+    private List<OTPManager> getOtp(String email) {
+        return jdbcTemplate.query("Select * from otpManager where email = ?",
+                new BeanPropertyRowMapper<>(OTPManager.class), email);
     }
 
     @Override
-    public String sendOTP() throws OTPGenerateException {
+    public String sendOTP(String userEmail) throws OTPGenerateException {
         if (sessionId == null) {
-            List<OTPManager> otpManager = getOtp();
+            Users user = userRepository.findByEmail(userEmail).get(0);
+            List<OTPManager> otpManager = getOtp(userEmail);
             if (otpManager.isEmpty()) {
                 int otp = generateOTP();
                 SimpleMailMessage email = new SimpleMailMessage();
                 email.setFrom("raspberrypi001025@gmail.com");
-                email.setTo(loggedUser.getEmail());
+                email.setTo(userEmail);
                 email.setSubject("OTP");
                 email.setText("Enter the OTP to verify the account\n" + otp);
                 javaMailSender.send(email);
-                jdbcTemplate.update("Insert into OTPManager values (? , ? , ?)", loggedUser.getUserId(), loggedUser.getEmail(), otp);
+                jdbcTemplate.update("Insert into OTPManager values (? , ? , ?)", user.getUserId(), userEmail, otp);
             } else {
                 SimpleMailMessage email = new SimpleMailMessage();
                 email.setFrom("raspberrypi001025@gmail.com");
-                email.setTo(loggedUser.getEmail());
+                email.setTo(userEmail);
                 email.setSubject("OTP");
                 email.setText("Enter the OTP to verify the account\n" + otpManager.get(0).getOtp());
                 javaMailSender.send(email);
@@ -327,7 +338,7 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
     @Override
     public boolean verifyOrderId(String orderId) {
         return jdbcTemplate.query("select * from myOrderItems where orderId = ? ",
-                new BeanPropertyRowMapper<>(MyOrderItems.class), orderId, loggedUser.getUserId()).isEmpty();
+                new BeanPropertyRowMapper<>(MyOrderItems.class), orderId).isEmpty();
     }
 
     @Override
@@ -426,9 +437,40 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
 
         int offset = pageSize * pageNumber;
         if (categoryName != null) {
-            if (!freeDelivery)
-                return withoutFreeDelivery(categoryName, sortBy, priceRange, openNow, paymentType, pageSize, offset);
-            else
+            if (!freeDelivery) {
+                if (openNow)
+                    if (sortBy.equalsIgnoreCase("Cost High To Low"))
+                        return jdbcTemplate.query("Select * from Restaurants where restaurant_id in(select restaurant_id from categories where categoryName = ?) " +
+                                        "and restaurant_id in( select restaurant_id from menu where itemPrice <= ? )" +
+                                        " and restaurant_id in(select restaurant_id from payment where paymentType = ?) " +
+                                        "and restaurant_id in(select restaurant_id from restaurants where close_at >= CURRENT_TIME()) " +
+                                        "order by restaurant_id in(select restaurant_id from menu where itemPrice < ?) DESC limit ? offset ?",
+                                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, priceRange, pageSize, offset);
+
+                    else if (sortBy.equalsIgnoreCase("Cost Low To High"))
+                        return jdbcTemplate.query("Select * from Restaurants where restaurant_id in(select restaurant_id from categories where categoryName = ?) " +
+                                        "and restaurant_id in(select restaurant_id from menu where itemPrice < ? ) " +
+                                        "and restaurant_id in(select restaurant_id from payment where paymentType = ?)" +
+                                        " and restaurant_id in(select restaurant_id from restaurants where close_at >= CURRENT_TIME()) " +
+                                        "order by restaurant_id in(select restaurant_id from menu where itemPrice < ?) ASC limit ? offset ?",
+                                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, priceRange, pageSize, offset);
+                    else if (sortBy.equalsIgnoreCase("Top Rated"))
+                        return jdbcTemplate.query("Select * from Restaurants where restaurant_id in(select restaurant_id from categories where categoryName = ?)" +
+                                        " and restaurant_id in( select restaurant_id from menu where itemPrice <= ? ) " +
+                                        "and restaurant_id in(select restaurant_id from payment where paymentType = ?) " +
+                                        "and restaurant_id in(select restaurant_id from restaurants where close_at >= CURRENT_TIME()) " +
+                                        "order by ratings DESC limit ? offset ?",
+                                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, priceRange, pageSize, offset);
+                    else
+                        return jdbcTemplate.query("Select * from Restaurants where restaurant_id in(select restaurant_id from categories where categoryName = ?) " +
+                                        "and restaurant_id in( select restaurant_id from menu where itemPrice <= ? ) " +
+                                        "and restaurant_id in(select restaurant_id from payment where paymentType = ?) " +
+                                        "and restaurant_id in(select restaurant_id from restaurants where close_at >= CURRENT_TIME()) " +
+                                        "limit ? offset ?",
+                                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, pageSize, offset);
+                else
+                    return withRestaurantClosesWithoutFreeDelivery(categoryName, sortBy, priceRange, paymentType, pageSize, offset);
+            } else
                 return withFreeDelivery(categoryName, sortBy, priceRange, openNow, paymentType, pageSize, offset);
         }
         throw new NullPointerException("Select one of the category");
@@ -476,11 +518,11 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
 
     private List<Restaurants> lowToHighWithOpenWithoutFreeDeliveryResult(String categoryName, int priceRange, String paymentType, int pageSize, int offset) {
         return jdbcTemplate.query("Select * from Restaurants where restaurant_id in(select restaurant_id from categories where categoryName = ?) " +
-                        "and restaurant_id in( select restaurant_id from menu where itemPrice <= ? ) " +
+                        "and restaurant_id in(select restaurant_id from menu where itemPrice < ? ) " +
                         "and restaurant_id in(select restaurant_id from payment where paymentType = ?)" +
                         " and restaurant_id in(select restaurant_id from restaurants where close_at >= CURRENT_TIME()) " +
-                        "order by itemPrice ASC limit ? offset ?",
-                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, pageSize, offset);
+                        "order by restaurant_id in(select restaurant_id from menu where itemPrice < ?) ASC limit ? offset ?",
+                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, priceRange, priceRange, pageSize, offset);
     }
 
     private List<Restaurants> highToLowWithOpenWithoutFreeDeliveryResult(String categoryName, int priceRange, String paymentType, int pageSize, int offset) {
@@ -488,8 +530,8 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
                         "and restaurant_id in( select restaurant_id from menu where itemPrice <= ? )" +
                         " and restaurant_id in(select restaurant_id from payment where paymentType = ?) " +
                         "and restaurant_id in(select restaurant_id from restaurants where close_at >= CURRENT_TIME()) " +
-                        "order by itemPrice DESC limit ? offset ?",
-                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, pageSize, offset);
+                        "order by restaurant_id in(select restaurant_id from menu where itemPrice < ?) DESC limit ? offset ?",
+                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, priceRange, pageSize, offset);
     }
 
     private List<Restaurants> withRestaurantClosesWithoutFreeDelivery(String categoryName, String sortBy, int priceRange, String paymentType, int pageSize, int offset) {
@@ -527,16 +569,16 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
         return jdbcTemplate.query("Select * from Restaurants where restaurant_id in(select restaurant_id from categories where categoryName = ?) " +
                         "and restaurant_id in( select restaurant_id from menu where itemPrice <= ? ) " +
                         "and restaurant_id in(select restaurant_id from payment where paymentType = ?) " +
-                        "order by itemPrice ASC limit ? offset ?",
-                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, pageSize, offset);
+                        "order by restaurant_id in(select restaurant_id from menu where itemPrice < ?) ASC limit ? offset ?",
+                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, priceRange, pageSize, offset);
     }
 
     private List<Restaurants> highToLowWithoutOpenWithoutFreeDeliveryResult(String categoryName, int priceRange, String paymentType, int pageSize, int offset) {
         return jdbcTemplate.query("Select * from Restaurants where restaurant_id in(select restaurant_id from categories where categoryName = ?) " +
                         "and restaurant_id in( select restaurant_id from menu where itemPrice <= ? ) " +
                         "and restaurant_id in(select restaurant_id from payment where paymentType = ?) " +
-                        "order by itemPrice DESC limit ? offset ?",
-                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, pageSize, offset);
+                        "order by restaurant_id in(select restaurant_id from menu where itemPrice < ?) DESC limit ? offset ?",
+                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, priceRange, pageSize, offset);
     }
 
     private List<Restaurants> withFreeDelivery(String categoryName, String sortBy, int priceRange, boolean openNow, String paymentType, int pageSize, int offset) {
@@ -565,7 +607,7 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
         return jdbcTemplate.query("Select * from Restaurants where restaurant_id in(select restaurant_id from categories where categoryName = ?) " +
                         "and restaurant_id in( select restaurant_id from menu where itemPrice <= ? ) " +
                         "and restaurant_id in(select restaurant_id from payment where paymentType = ?) " +
-                        "and restaurant_id in(select restaurant_id from categories where freeDelivery = 0) " +
+                        "and restaurant_id in(select restaurant_id from categories where deliveryCharge = 0) " +
                         "limit ? offset ?",
                 new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, pageSize, offset);
 
@@ -575,7 +617,7 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
         return jdbcTemplate.query("Select * from Restaurants where restaurant_id in(select * from categories where categoryName = ?) " +
                         "and restaurant_id in( select restaurant_id from menu where itemPrice <= ? ) " +
                         "and restaurant_id in(select restaurant_id from payment where paymentType = ?) " +
-                        "and restaurant_id in(select restaurant_id from categories where freeDelivery = 0) " +
+                        "and restaurant_id in(select restaurant_id from categories where deliveryCharge = 0) " +
                         "order by ratings DESC limit ? offset ?",
                 new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, pageSize, offset);
     }
@@ -584,18 +626,18 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
         return jdbcTemplate.query("Select * from Restaurants where restaurant_id in(select restaurant_id from categories where categoryName = ?) " +
                         "and restaurant_id in( select restaurant_id from menu where itemPrice <= ? ) " +
                         "and restaurant_id in(select restaurant_id from payment where paymentType = ?) " +
-                        "and restaurant_id in(select restaurant_id from categories where freeDelivery = 0) " +
-                        "order by itemPrice ASC limit ? offset ?",
-                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, pageSize, offset);
+                        "and restaurant_id in(select restaurant_id from categories where deliveryCharge = 0) " +
+                        "order by restaurant_id in(select restaurant_id from menu where itemPrice < ?) ASC limit ? offset ?",
+                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, priceRange, pageSize, offset);
     }
 
     private List<Restaurants> highToLowWithoutOpenWithFreeDeliveryResult(String categoryName, int priceRange, String paymentType, int pageSize, int offset) {
         return jdbcTemplate.query("Select * from Restaurants where restaurant_id in(select restaurant_id from categories where categoryName = ?) " +
                         "and restaurant_id in( select restaurant_id from menu where itemPrice <= ? ) " +
                         "and restaurant_id in(select restaurant_id from payment where paymentType = ?) " +
-                        "and restaurant_id in(select restaurant_id from categories where freeDelivery = 0) " +
-                        "order by itemPrice DESC limit ? offset ?",
-                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, pageSize, offset);
+                        "and restaurant_id in(select restaurant_id from categories where deliveryCharge = 0) " +
+                        "order by restaurant_id in(select restaurant_id from menu where itemPrice < ?) DESC limit ? offset ?",
+                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, priceRange, pageSize, offset);
     }
 
     private List<Restaurants> withRestaurantOpenWithFreeDelivery(String categoryName, String sortBy, int priceRange, String paymentType, int pageSize, int offset) {
@@ -619,7 +661,7 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
                         "and restaurant_id in( select restaurant_id from menu where itemPrice <= ? ) " +
                         "and restaurant_id in(select restaurant_id from payment where paymentType = ?) " +
                         "and restaurant_id in(select restaurant_id from restaurants where close_at >= CURRENT_TIME()) " +
-                        "and restaurant_id in( select restaurant_id from categories where freeDelivery = 0) " +
+                        "and restaurant_id in( select restaurant_id from categories where deliveryCharge = 0) " +
                         "limit ? offset ?",
                 new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, pageSize, offset);
     }
@@ -629,7 +671,7 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
                         "and restaurant_id in( select restaurant_id from menu where itemPrice <= ? ) " +
                         "and restaurant_id in(select restaurant_id from payment where paymentType = ?) " +
                         "and restaurant_id in(select restaurant_id from restaurants where close_at >= CURRENT_TIME()) " +
-                        "and restaurant_id in( select restaurant_id from categories where freeDelivery = 0) " +
+                        "and restaurant_id in( select restaurant_id from categories where deliveryCharge = 0) " +
                         "order by ratings DESC limit ? offset ?",
                 new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, pageSize, offset);
     }
@@ -639,9 +681,9 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
                         "and restaurant_id in( select restaurant_id from menu where itemPrice <= ? ) " +
                         "and restaurant_id in(select restaurant_id from payment where paymentType = ?) " +
                         "and restaurant_id in(select restaurant_id from restaurants where close_at >= CURRENT_TIME())" +
-                        "and restaurant_id in( select restaurant_id from categories where freeDelivery = 0) " +
-                        "order by itemPrice ASC limit ? offset ?",
-                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, pageSize, offset);
+                        "and restaurant_id in( select restaurant_id from categories where deliveryCharge = 0) " +
+                        "order by restaurant_id in(select restaurant_id from menu where itemPrice < ?) ASC limit ? offset ?",
+                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, priceRange, pageSize, offset);
     }
 
     private List<Restaurants> highToLowWithOpenWithFreeDeliveryResult(String categoryName, int priceRange, String paymentType, int pageSize, int offset) {
@@ -649,9 +691,9 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
                         "and restaurant_id in( select restaurant_id from menu where itemPrice <= ? ) " +
                         "and restaurant_id in(select restaurant_id from payment where paymentType = ?) " +
                         "and restaurant_id in(select restaurant_id from restaurants where close_at >= CURRENT_TIME()) " +
-                        "and restaurant_id in( select restaurant_id from categories where freeDelivery = 0) " +
-                        "order by itemPrice DESC limit ? offset ?",
-                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, pageSize, offset);
+                        "and restaurant_id in( select restaurant_id from categories where deliveryCharge = 0) " +
+                        "order by restaurant_id in(select restaurant_id from menu where itemPrice < ?) DESC limit ? offset ?",
+                new BeanPropertyRowMapper<>(Restaurants.class), categoryName, priceRange, paymentType, priceRange, pageSize, offset);
     }
 
 
@@ -753,6 +795,8 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
         String orderId = generateId();
         if (!verifyOrderId(orderId))
             addOrders(restaurantId, orders, paymentType);
+        jdbcTemplate.update("Insert into myOrders values(?,?,?,?,?,?,?)", orderId, loggedUser.getUserId(), restaurantId,
+                LocalDateTime.now(), 0, paymentType, OrderStatus.PAYMENTPENDING.toString());
         for (String categoryName : orders.keySet()) {
             //extracting item name with number of items
             Map<String, Integer> items = orders.get(categoryName);
@@ -763,8 +807,7 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
                 jdbcTemplate.update("Insert into myOrderItems values(?,?,?,?)", orderId, itemName, categoryName, items.get(itemName));
             }
         }
-        jdbcTemplate.update("Insert into myOrders values(?,?,?,?,?,?,?)", orderId, loggedUser.getUserId(), restaurantId,
-                LocalDateTime.now(), totalBill, paymentType, OrderStatus.PAYMENTPENDING.toString());
+        jdbcTemplate.update("update myOrders set totalBill = ?",totalBill);
         return jdbcTemplate.query("select * from myOrders where orderId = ?",
                 new BeanPropertyRowMapper<>(MyOrders.class), orderId);
     }
@@ -788,16 +831,16 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
     }
 
     private void updatePaymentType(String paymentType, String orderId) {
-        jdbcTemplate.update("update myOrders set paymentType = ? where orderId = ?", paymentType);
+        jdbcTemplate.update("update myOrders set paymentMethod = ? where orderId = ?", paymentType,orderId);
     }
 
     private String bookOrderToHotel(String restaurantId, String orderId) {
 
-        int totalBill = jdbcTemplate.query("select 8 from myOrders where orderId = ?",
+        int totalBill = jdbcTemplate.query("select * from myOrders where orderId = ?",
                 new BeanPropertyRowMapper<>(MyOrders.class), orderId).get(0).getTotalBill();
         jdbcTemplate.update("update myOrders set orderStatus = ? where orderId = ?", OrderStatus.CONFIRMED.toString(),
                 orderId);
-        jdbcTemplate.update("insert into values(?,?,?)", restaurantId, orderId, totalBill);
+        jdbcTemplate.update("insert into restaurantOrders values(?,?,?)", restaurantId, orderId, totalBill);
         return "your order confirmed.Thank you";
 
     }
@@ -820,7 +863,7 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
     @Override
     public String addToFavourite(String restaurantName) throws SessionIdExpiredException {
         checkSession();
-        jdbcTemplate.update("insert into favourites(?,?)", loggedUser.getUserId(), restaurantName);
+        jdbcTemplate.update("insert into favourites values(?,?)", loggedUser.getUserId(), restaurantName);
         return "restaurant added to your favourite list";
     }
 
@@ -840,7 +883,7 @@ public class UserServiceImplementation implements LoginInterface, SystemInterfac
     @Override
     public List<Favourite> viewFavorites() throws SessionIdExpiredException {
         checkSession();
-        return jdbcTemplate.query("select * from favourite", new BeanPropertyRowMapper<>(Favourite.class));
+        return jdbcTemplate.query("select * from favourites", new BeanPropertyRowMapper<>(Favourite.class));
     }
 
 

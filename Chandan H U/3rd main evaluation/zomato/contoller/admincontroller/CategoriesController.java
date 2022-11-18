@@ -37,7 +37,7 @@ public class CategoriesController {
         return ResponseEntity.of(Optional.of(categoryInterface.removeCategory(categoryName)));
     }
 
-    @GetMapping("/details")
+    @GetMapping("/details-categories")
     public ResponseEntity<List<Categories>> viewCategories() throws SessionIdExpiredException {
         return ResponseEntity.of(Optional.of(categoryInterface.viewCategories()));
     }

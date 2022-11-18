@@ -37,9 +37,9 @@ public class UserLoginController {
     }
 
     @PostMapping("/sign-up")
-    public ResponseEntity<String> newRegistration(@ModelAttribute @Valid Users user, @RequestParam MultipartFile file) throws SignupException, SessionIdExpiredException, UsernameNotFoundException {
+    public ResponseEntity<String> newRegistration(@ModelAttribute @Valid Users user, @RequestParam MultipartFile profilePhotos) throws SignupException, SessionIdExpiredException, UsernameNotFoundException {
         if (user != null)
-            return ResponseEntity.of(Optional.of(loginInterface.signUp(user, file)));
+            return ResponseEntity.of(Optional.of(loginInterface.signUp(user, profilePhotos)));
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Provide valid details for registration");
     }
 
@@ -65,18 +65,18 @@ public class UserLoginController {
     }
 
     @PostMapping("/send-otp")
-    public ResponseEntity<String> sendOtp() throws Exception {
-        return ResponseEntity.of(Optional.of(systemInterface.sendOTP()));
+    public ResponseEntity<String> sendOtp(@RequestParam String email) throws Exception {
+        return ResponseEntity.of(Optional.of(systemInterface.sendOTP(email)));
     }
 
     @PatchMapping("/verify-email")
-    public ResponseEntity<String> verifyEmail(@RequestParam int otp) throws Exception {
-        return ResponseEntity.of(Optional.of(systemInterface.verifyEmail(otp)));
+    public ResponseEntity<String> verifyEmail(@RequestParam int otp,@RequestParam String email) throws Exception {
+        return ResponseEntity.of(Optional.of(systemInterface.verifyEmail(otp,email )));
     }
 
     @PatchMapping("/change-profile-photo")
-    public ResponseEntity<String> changeProfilePhoto(@RequestParam MultipartFile file) throws SessionIdExpiredException, IOException {
-        return ResponseEntity.of(Optional.of(loginInterface.changeProfilePhoto(file)));
+    public ResponseEntity<String> changeProfilePhoto(@RequestParam MultipartFile profilePhoto) throws SessionIdExpiredException, IOException {
+        return ResponseEntity.of(Optional.of(loginInterface.changeProfilePhoto(profilePhoto)));
     }
 
     @GetMapping("/view-profile-photo")

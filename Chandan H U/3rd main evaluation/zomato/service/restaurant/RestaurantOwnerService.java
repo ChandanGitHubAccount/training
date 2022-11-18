@@ -12,6 +12,7 @@ import zomato.entity.Restaurants;
 import zomato.model.Categories;
 import zomato.model.Menu;
 import zomato.model.Payment;
+import zomato.model.RestaurantOrders;
 import zomato.repositatory.RestaurantRepository;
 import zomato.service.Days;
 
@@ -19,6 +20,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.EnumSet;
 import java.util.List;
@@ -26,7 +28,7 @@ import java.util.Optional;
 import java.util.Random;
 
 @Service
-public class RestaurantOwnerService implements RestaurantInterface, CategoryInterface, MenuInterface, PaymentInterface {
+public class RestaurantOwnerService implements RestaurantInterface, CategoryInterface, MenuInterface, PaymentInterface, RestaurantOrdersInterface {
 
     private static final String restaurantFilePath = "C:\\Users\\Chandan H U\\Desktop\\restaurantPhoto";
 
@@ -222,8 +224,9 @@ public class RestaurantOwnerService implements RestaurantInterface, CategoryInte
         checkSession();
         if (!categories.isEmpty()) {
             for (Categories category : categories)
-                jdbcTemplate.update("Insert into categories values (? , ? , ? , ?)", category.getCategoryName(),
-                        loggedOwner.getRestaurantId(), category.getDeliveryCharge(), 0);
+                jdbcTemplate.update("Insert into categories values (? , ? , ?)", category.getCategoryName(),
+                        loggedOwner.getRestaurantId(), category.getDeliveryCharge());
+            return "categories added successfully";
         }
         throw new NullPointerException("categories cannot be empty");
 
@@ -289,9 +292,10 @@ public class RestaurantOwnerService implements RestaurantInterface, CategoryInte
             } else {
                 menu.setItemPhoto(dishFilePath + File.separator + dishPhoto.getOriginalFilename());
                 dishPhoto.transferTo(Path.of(dishFilePath + File.separator + dishPhoto.getOriginalFilename()));
-                jdbcTemplate.update("Insert into menu values(?,?,?,?,?,?,?)", menu.getItemName(), menu.getCategoryName(),
-                        menu.getDescription(), menu.getItemPrice(), 0, menu.getItemPhoto(), loggedOwner.getRestaurantId());
+                jdbcTemplate.update("Insert into menu values(?,?,?,?,?,?)", menu.getItemName(), menu.getCategoryName(),
+                        menu.getDescription(), menu.getItemPrice(), menu.getItemPhoto(), loggedOwner.getRestaurantId());
             }
+            return "menu added successfully";
         }
         throw new NullPointerException("Menu cannot be null");
 
@@ -392,7 +396,7 @@ public class RestaurantOwnerService implements RestaurantInterface, CategoryInte
         if (!payments.isEmpty()) {
             for (Payment payment : payments)
                 if (paymentTypeExit(payment.getPaymentType()))
-                    jdbcTemplate.update("Insert into values (? , ? )", payment.getPaymentType(),
+                    jdbcTemplate.update("Insert into payment values (? , ? )", payment.getPaymentType(),
                             loggedOwner.getRestaurantId());
             return "payments added successfully";
         }
@@ -415,5 +419,35 @@ public class RestaurantOwnerService implements RestaurantInterface, CategoryInte
         }
         throw new UpdateFailedException("Payment type not found");
 
+    }
+
+    /**
+     * RestaurantOrders Interface
+     */
+
+    @Override
+    public List<RestaurantOrders> viewCurrentDayOrders(String orderId) throws SessionIdExpiredException {
+        checkSession();
+        List<RestaurantOrders> restaurantOrders = jdbcTemplate.query("Select * from RestaurantOrders where orderId = ?",
+                new BeanPropertyRowMapper<>(RestaurantOrders.class), orderId);
+        if (restaurantOrders.isEmpty())
+            throw new NullPointerException("no orders placed with this id");
+        else return restaurantOrders;
+    }
+
+    @Override
+    public List<RestaurantOrders> viewPastOrders(LocalDate date) throws SessionIdExpiredException {
+        checkSession();
+        return null;
+    }
+
+    @Override
+    public List<RestaurantOrders> viewAllOrders() throws SessionIdExpiredException {
+        checkSession();
+        List<RestaurantOrders> restaurantOrders = jdbcTemplate.query("Select * from RestaurantOrders where restaurant_id = ?",
+                new BeanPropertyRowMapper<>(RestaurantOrders.class),loggedOwner.getRestaurantId());
+        if (restaurantOrders.isEmpty())
+            throw new NullPointerException("no orders placed for your restaurant");
+        else return restaurantOrders;
     }
 }

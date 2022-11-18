@@ -36,36 +36,36 @@ public class RestaurantController {
         return ResponseEntity.ok().contentType(MediaType.valueOf("image/png")).body(image);
     }
 
-    @PatchMapping("change-restaurant-photo")
+    @PatchMapping("/change-restaurant-photo")
     public ResponseEntity<String> changeRestaurantPhoto(@RequestParam MultipartFile restaurantPhoto)
             throws SessionIdExpiredException, IOException, UpdateFailedException {
         return ResponseEntity.of(Optional.of(restaurantInterface.changeRestaurantPhoto(restaurantPhoto)));
     }
 
-    @PatchMapping("change-open-time")
+    @PatchMapping("/change-open-time")
     public ResponseEntity<String> changeOpenTime(@RequestParam int openHour, @RequestParam int openMinutes)
             throws InvalidTimeException, SessionIdExpiredException {
         return ResponseEntity.of(Optional.of(restaurantInterface.changeOpenTime(openHour, openMinutes)));
     }
 
-    @PatchMapping("change-close-time")
+    @PatchMapping("/change-close-time")
     public ResponseEntity<String> changeCloseTime(@RequestParam int closeHour, @RequestParam int closeMinutes)
             throws InvalidTimeException, SessionIdExpiredException {
         return ResponseEntity.of(Optional.of(restaurantInterface.changeCloseTime(closeHour, closeMinutes)));
     }
 
-    @PatchMapping("change-close-day")
+    @PatchMapping("/change-close-day")
     public ResponseEntity<String> changeCloseDay(@RequestParam String day) throws SessionIdExpiredException, UpdateFailedException {
         return ResponseEntity.of(Optional.of(restaurantInterface.changeCloseDay(day.toUpperCase())));
     }
 
-    @PatchMapping("change-restaurant-address")
+    @PatchMapping("/change-restaurant-address")
     public ResponseEntity<String> changeRestaurantAddress(@RequestParam String restaurantAddress)
             throws SessionIdExpiredException, UpdateFailedException {
         return ResponseEntity.of(Optional.of(restaurantInterface.changeRestaurantAddress(restaurantAddress)));
     }
 
-    @PatchMapping("change-restaurant-name")
+    @PatchMapping("/change-restaurant-name")
     public ResponseEntity<String> changeRestaurantName(@RequestParam String restaurantName)
             throws SessionIdExpiredException, UpdateFailedException {
         return ResponseEntity.of(Optional.of(restaurantInterface.changeRestaurantName(restaurantName)));

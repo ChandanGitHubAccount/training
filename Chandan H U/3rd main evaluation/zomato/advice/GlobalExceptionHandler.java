@@ -1,15 +1,19 @@
 package zomato.advice;
 
 import org.hibernate.id.IdentifierGenerationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
+import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import zomato.coustomexcptions.*;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.AccessDeniedException;
 import java.sql.SQLIntegrityConstraintViolationException;
@@ -36,6 +40,30 @@ public class GlobalExceptionHandler {
         return errorMessage;
     }
 
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public Map<String, String> handelMissingServletRequestPartException(MissingServletRequestPartException exception) {
+        Map<String, String> errorMessage = new HashMap<>();
+        errorMessage.put("Error message ", exception.getMessage());
+        return errorMessage;
+    }
+
+    @ExceptionHandler(BindException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public Map<String, String> handelBindException(BindException exception) {
+        Map<String, String> errorMessage = new HashMap<>();
+        errorMessage.put("Error message ", exception.getMessage());
+        return errorMessage;
+    }
+
+    @ExceptionHandler(FileNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public Map<String, String> handelFileNotFoundException(FileNotFoundException exception) {
+        Map<String, String> errorMessage = new HashMap<>();
+        errorMessage.put("Error message ", exception.getMessage());
+        return errorMessage;
+    }
+
     @ExceptionHandler(IndexOutOfBoundsException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public Map<String, String> handelIndexOutOfBoundsException(IndexOutOfBoundsException exception) {
@@ -49,6 +77,14 @@ public class GlobalExceptionHandler {
     public Map<String, String> handleSQLIntegrityConstraintViolationException(SQLIntegrityConstraintViolationException exception) {
         Map<String, String> stringStringMap = new HashMap<>();
         stringStringMap.put("error message", exception.getMessage());
+        return stringStringMap;
+    }
+
+    @ExceptionHandler(DuplicateKeyException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Map<String, String> handleDuplicateKeyException(DuplicateKeyException exception) {
+        Map<String, String> stringStringMap = new HashMap<>();
+        stringStringMap.put("error message", "Already present in your list list");
         return stringStringMap;
     }
 
@@ -80,7 +116,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public Map<String, String> handelIdentifierGenerationException(IdentifierGenerationException exception) {
         Map<String, String> errorMessage = new HashMap<>();
-        errorMessage.put("Error message ", exception.getMessage()+"\nplease select the photo proper image");
+        errorMessage.put("Error message ", exception.getMessage() + "\nplease select the photo proper image");
         return errorMessage;
     }
 
@@ -88,7 +124,15 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public Map<String, String> handelAccessDeniedException(AccessDeniedException exception) {
         Map<String, String> errorMessage = new HashMap<>();
-        errorMessage.put("Error message ","please select the photo proper image");
+        errorMessage.put("Error message ", "please select the photo proper image");
+        return errorMessage;
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public Map<String, String> handelIllegalStateException(IllegalStateException exception) {
+        Map<String, String> errorMessage = new HashMap<>();
+        errorMessage.put("Error message ", "please select the photo proper image");
         return errorMessage;
     }
 

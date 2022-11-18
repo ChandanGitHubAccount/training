@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/user")
+@RequestMapping("/user/home")
 public class HomeController {
 
     /**
@@ -34,7 +34,7 @@ public class HomeController {
     }
 
     @GetMapping("/view-categories")
-    public ResponseEntity<List<Categories>> viewCategories(int pageNumber, int pageSize) throws SessionIdExpiredException {
+    public ResponseEntity<List<Categories>> viewCategories(@RequestParam int pageNumber,@RequestParam int pageSize) throws SessionIdExpiredException {
         return ResponseEntity.of(Optional.of(homeInterface.viewCategories(pageNumber, pageSize)));
     }
 
