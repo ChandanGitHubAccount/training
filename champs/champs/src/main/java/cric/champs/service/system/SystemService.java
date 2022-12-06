@@ -1,11 +1,11 @@
 package cric.champs.service.system;
 
 import cric.champs.customexceptions.EmailValidationException;
-import cric.champs.entity.ResultModel;
 import cric.champs.customexceptions.OTPGenerateException;
-import cric.champs.entity.Users;
-import cric.champs.entity.OTPManager;
+import cric.champs.entity.*;
 import cric.champs.service.AccountStatus;
+import cric.champs.service.MatchStatus;
+import cric.champs.service.TournamentStatus;
 import io.jsonwebtoken.impl.DefaultClaims;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
@@ -14,13 +14,15 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Service;
 
-import java.time.LocalTime;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+@Service
 public class SystemService implements SystemInterface {
 
     @Autowired
@@ -35,15 +37,33 @@ public class SystemService implements SystemInterface {
     }
 
     @Override
+    public String generateTournamentCode() {
+        Random random = new Random();
+        final String Characters = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        final char[] symbols = Characters.toCharArray();
+        char[] tournamentCode = new char[6];
+        for (int index = 0; index < 6; index++) {
+            tournamentCode[index] = symbols[random.nextInt(symbols.length)];
+        }
+        return new String(tournamentCode);
+    }
+
+    @Override
     public boolean verifyEmail(String email) {
-        return jdbcTemplate.query("select * from users where email = ? and isDelete = 'false'",
+        return jdbcTemplate.query("select * from users where email = ? and isDeleted = 'false'",
                 new BeanPropertyRowMapper<>(Users.class), email).isEmpty();
     }
 
     @Override
+    public boolean verifyOtp(int otp, String email) {
+        OTPManager otpManager = getOtp(email).get(0);
+        return otp == otpManager.getOtp() && otpManager.getExpireAt().isAfter(LocalDateTime.now());
+    }
+
+    @Override
     public ResultModel verifyUserAccount(int otp, String email) throws EmailValidationException {
-        if (otp == getOtp(email).get(0).getOtp()) {
-            jdbcTemplate.update("update users set account_status = ?", AccountStatus.VERIFIED.toString());
+        if (verifyOtp(otp, email)) {
+            jdbcTemplate.update("update users set accountStatus = ?", AccountStatus.VERIFIED.toString());
             return new ResultModel("Email verified successfully");
         }
         throw new EmailValidationException("Incorrect OTP");
@@ -64,10 +84,35 @@ public class SystemService implements SystemInterface {
         int otp = generateOTP();
         if (otpManager.isEmpty())
             jdbcTemplate.update("Insert into OTPManager values (? , ? , ? , ?)", user.get(0).getUserId(), userEmail,
-                    otp, LocalTime.now().plusMinutes(5));
+                    otp, LocalDateTime.now().plusMinutes(5));
         else
-            jdbcTemplate.update("update OTPManager set otp = ? and expireAt = ? where email = ?", otp, userEmail,
-                    LocalTime.now().plusMinutes(5));
+            jdbcTemplate.update("update OTPManager set otp = ?, expireAt = ? where email = ?", otp,
+                    LocalDateTime.now().plusMinutes(5), userEmail);
+
+        SimpleMailMessage email = new SimpleMailMessage();
+        email.setFrom("raspberrypi001025@gmail.com");
+        email.setTo(userEmail);
+        email.setSubject("Cric Champs Registration OTP");
+        email.setText("Please enter the following OTP in your Cric Champs App to verify your account: \n" + otp);
+        javaMailSender.send(email);
+
+        return new ResultModel("OTP sent Successfully");
+    }
+
+    @Override
+    public ResultModel forgetOtp(String userEmail) throws OTPGenerateException {
+        List<Users> user = getUserDetails(userEmail, AccountStatus.VERIFIED.toString());
+
+        if (user.isEmpty())
+            throw new OTPGenerateException("enter valid registered email");
+        List<OTPManager> otpManager = getOtp(userEmail);
+        int otp = generateOTP();
+        if (otpManager.isEmpty())
+            jdbcTemplate.update("Insert into OTPManager values (? , ? , ? , ?)", user.get(0).getUserId(), userEmail,
+                    otp, LocalDateTime.now().plusMinutes(5));
+        else
+            jdbcTemplate.update("update OTPManager set otp = ?, expireAt = ? where email = ?", otp,
+                    LocalDateTime.now().plusMinutes(5), userEmail);
 
         SimpleMailMessage email = new SimpleMailMessage();
         email.setFrom("raspberrypi001025@gmail.com");
@@ -88,12 +133,12 @@ public class SystemService implements SystemInterface {
     @Override
     public List<Users> getUserDetails(String email, String accountStatus) {
         return jdbcTemplate.query("select * from users where email = ? and accountStatus = ?" +
-                " and isDelete = 'false'", new BeanPropertyRowMapper<>(Users.class), email, accountStatus);
+                " and isDeleted = 'false'", new BeanPropertyRowMapper<>(Users.class), email, accountStatus);
     }
 
     @Override
     public Users getUserDetailByUserId() {
-        return jdbcTemplate.query("select * from users where userId = ?  and isDelete = 'false'",
+        return jdbcTemplate.query("select * from users where userId = ?  and isDeleted = 'false'",
                 new BeanPropertyRowMapper<>(Users.class), getUserId()).get(0);
     }
 
@@ -101,4 +146,79 @@ public class SystemService implements SystemInterface {
     public Map<String, Object> getMapFromDefaultClaim(DefaultClaims claims) {
         return new HashMap<>(claims);
     }
+
+    @Override
+    public List<Tournaments> verifyTournamentCode(String tournamentCode) {
+        return jdbcTemplate.query("select * from tournaments where tournamentCode = ? and tournamentStatus != ?",
+                new BeanPropertyRowMapper<>(Tournaments.class), tournamentCode, TournamentStatus.CANCELLED.toString());
+    }
+
+    @Override
+    public ResultModel deleteMatches(long tournamentId) {
+        rejectRequest();
+        jdbcTemplate.update("update matches set isCancelled = ? where tournamentId = ? ",
+                MatchStatus.ABANDONED.toString(), tournamentId);
+        return new ResultModel("Cancelled successfully");
+    }
+
+    @Override
+    public List<Tournaments> verifyTournamentId(long tournamentId) {
+        rejectRequest();
+        return jdbcTemplate.query("select * from tournaments where tournamentId = ? and userId = ? and tournamentStatus != ?",
+                new BeanPropertyRowMapper<>(Tournaments.class), tournamentId, getUserId(),TournamentStatus.CANCELLED.toString());
+    }
+
+    @Override
+    public List<Grounds> verifyLatitudeAndLongitude(double latitude, double longitude, long tournamentId) {
+        rejectRequest();
+        return jdbcTemplate.query("select * from grounds where latitude = ? and longitude = ? and tournamentId = ? " +
+                "and isDeleted = 'false'", new BeanPropertyRowMapper<>(Grounds.class), latitude, longitude, tournamentId);
+    }
+
+    //verify user tournament accounts
+    @Override
+    public List<Tournaments> verifyUserID() {
+        return jdbcTemplate.query("select * from tournaments where userId = ?",
+                new BeanPropertyRowMapper<>(Tournaments.class), getUserId());
+    }
+
+    @Override
+    public List<Teams> verifyTeamDetails(long teamId, long tournamentId) {
+        return jdbcTemplate.query("select * from teams where teamId = ? and tournamentId = ? and isDeleted = 'false'",
+                new BeanPropertyRowMapper<>(Teams.class), teamId, tournamentId);
+    }
+
+    @Override
+    public List<Players> verifyPlayerDetails(long playerId, long teamId, long tournamentId) {
+        if (verifyTournamentId(tournamentId).isEmpty())
+            return null;
+        return jdbcTemplate.query("select * from players where playerId = ? and teamId = ? and tournamentId = ? and isDeleted = 'false'",
+                new BeanPropertyRowMapper<>(Players.class), playerId, teamId, tournamentId);
+    }
+
+    @Override
+    public List<Players> verifyTeamAndTournamentId(long teamId, long tournamentId) {
+        return jdbcTemplate.query("select * from players where teamId = ? and tournamentId = ? and isDeleted = 'false'",
+                new BeanPropertyRowMapper<>(Players.class), teamId, tournamentId);
+    }
+
+    @Override
+    public List<Grounds> verifyGroundId(long groundId, long tournamentId) {
+        rejectRequest();
+        return jdbcTemplate.query("select * from grounds where groundId = ? and isDeleted = 'false' and tournamentId = ?",
+                new BeanPropertyRowMapper<>(Grounds.class), groundId, tournamentId);
+    }
+
+    private void rejectRequest() {
+        if (verifyUserID().isEmpty())
+            throw new NullPointerException("Access denied");
+    }
+
+    @Override
+    public List<Umpires> verifyUmpireDetails(long tournamentId, long umpireId) {
+        rejectRequest();
+        return jdbcTemplate.query("select * from umpires where umpireId = ? and tournamentId = ? and isDeleted = 'false'",
+                new BeanPropertyRowMapper<>(Umpires.class), umpireId, tournamentId);
+    }
+
 }

@@ -11,7 +11,7 @@ import java.util.Map;
 @Service
 public class UploadImageTOCloud implements ImageUploadInterface {
 
-    private Cloudinary cloudinary = new Cloudinary();
+    private final Cloudinary cloudinary;
 
     public UploadImageTOCloud() {
         cloudinary = Singleton.getCloudinary();

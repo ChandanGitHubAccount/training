@@ -1,4 +1,4 @@
-package cric.champs.entity;
+package cric.champs.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -7,25 +7,20 @@ import lombok.Setter;
 
 import javax.validation.constraints.Pattern;
 
-@Setter
 @Getter
+@Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class Umpires {
+public class UmpiresMatches {
 
     private long umpireId;
 
-    private long tournamentId;
+    private long matchId;
+
+    private int matchNumber;
 
     @Pattern(regexp = "^[A-Za-z]+\\s+|\\s+[A-Za-z]+\\s+$", message = "Umpire name should only contain alphabets")
     private String umpireName;
-
-    @Pattern(regexp = "^[A-Za-z]+\\s+|\\s+[A-Za-z]+\\s+$", message = "City name should only contain alphabets")
-    private String city;
-
-    private String phoneNumber;
-
-    private String umpirePhoto;
 
     private String isDeleted;
 }

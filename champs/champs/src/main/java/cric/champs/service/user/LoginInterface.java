@@ -1,29 +1,31 @@
 package cric.champs.service.user;
 
 import cric.champs.customexceptions.*;
+import cric.champs.entity.ResultModel;
 import cric.champs.entity.Users;
-import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
-import java.io.IOException;
-import java.util.Map;
 
 public interface LoginInterface {
 
-    Map<String, String> signIn(String userName, String password) throws LoginFailedException;
+    String signIn(String userName, String password) throws LoginFailedException, NotVerifiedException;
 
-    Map<String, String> refreshToken(HttpServletRequest httpServletRequest);
+    String refreshToken(HttpServletRequest httpServletRequest);
 
-    String signUp(Users user, MultipartFile file) throws SignupException, UsernameNotFoundException, IOException;
+    ResultModel signUp(Users user) throws SignupException;
 
-    String forgotPassword(String username) throws UsernameNotFoundException;
+    ResultModel forgotPassword(String username) throws UsernameNotFoundException, OTPGenerateException;
 
-    String resetPassword(String token, String newPassword, String confirmPassword) throws TokenExpiredException;
+    boolean resetPassword(int otp, String email);
 
-    String changePassword(String newPassword, String confirmPassword) throws Exception;
+    ResultModel changePassword(String newPassword, String confirmPassword) throws UpdateFailedException;
 
-    String changeProfilePhoto(MultipartFile file) throws IOException, UpdateFailedException;
+    ResultModel resetPassword(String newPassword, String confirmPassword, String email) throws UpdateFailedException;
 
-    String deleteOldProfilePhoto();
+    ResultModel changeProfilePhoto(String photoLink) throws UpdateFailedException;
+
+    ResultModel deleteOldProfilePhoto();
+
+    Users getUserDetails();
 
 }

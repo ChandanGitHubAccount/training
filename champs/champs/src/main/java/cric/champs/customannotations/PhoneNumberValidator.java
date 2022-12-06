@@ -6,6 +6,6 @@ import javax.validation.ConstraintValidatorContext;
 public class PhoneNumberValidator implements ConstraintValidator<PhoneNumber, String> {
     @Override
     public boolean isValid(String phoneNumber, ConstraintValidatorContext constraintValidatorContext) {
-        return phoneNumber.length() == 13 && phoneNumber.startsWith("+");
+        return phoneNumber==null || phoneNumber.length() == 13 && phoneNumber.startsWith("+91");
     }
 }

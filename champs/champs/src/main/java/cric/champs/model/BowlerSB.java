@@ -7,41 +7,34 @@ import lombok.Setter;
 
 import javax.validation.constraints.Pattern;
 
-@Setter
 @Getter
+@Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class PlayerStats {
+public class BowlerSB {
 
-    private long playerId;
+    private long scoreBoardId;
 
     private long tournamentId;
 
+    private long matchId;
+
     private long teamId;
+
+    private long playerId;
 
     @Pattern(regexp = "^[A-Za-z]+\\s+|\\s+[A-Za-z]+\\s+$", message = "Player name should only contain alphabets")
     private String playerName;
 
-    private double battingAverage;
+    private int runs;
 
-    private double battingStrikeRate;
+    private int overs;
 
-    private int totalFifties;
+    private int balls;
 
-    private int totalHundreds;
+    private int maidenOvers;
 
-    private int totalFours;
+    private int wickets;
 
-    private  int totalSixes;
-
-    private int mostWickets;
-
-    private int mostRuns;
-
-    private double bestBowlingAverage;
-
-    private double bestBowlingEconomy;
-
-    private int mostFiveWicketsHaul;
-
+    private double economyRate;
 }
